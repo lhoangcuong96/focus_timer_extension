@@ -296,7 +296,8 @@ body::before {
     font-weight: 500;
 }
 
-.setting-item input {
+.setting-item input,
+.setting-item select {
     width: 100%;
     padding: 14px 16px;
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -307,11 +308,21 @@ body::before {
     transition: all 0.3s;
 }
 
-.setting-item input:focus {
+.setting-item input:focus,
+.setting-item select:focus {
     outline: none;
     border-color: #667eea;
     background: rgba(255, 255, 255, 0.12);
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+.setting-item select {
+    cursor: pointer;
+}
+
+.setting-item select option {
+    background: #2d2d2d;
+    color: white;
 }
 
 .settings-buttons {

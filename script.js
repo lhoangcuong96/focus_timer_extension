@@ -110,12 +110,12 @@ function startTimer() {
       }
 
       if (Notification.permission === "granted") {
-        new Notification("⏰ Focus Timer", {
-          body: "Time is up!",
+        new Notification(`⏰ ${languageManager.t("focusTimer")}`, {
+          body: languageManager.t("timeIsUp"),
           icon: "https://cdn-icons-png.flaticon.com/512/2935/2935323.png",
         });
       }
-      alert("⏰ Time is up!");
+      alert(`⏰ ${languageManager.t("timeIsUp")}`);
 
       // Reset timer to default time for the current mode after session ends
       timeLeft = settings[currentMode] * 60;
@@ -141,18 +141,25 @@ function changeMode(mode) {
 
   // If timer is running, show warning
   if (isRunning) {
-    const modeNames = {
-      focus: "Focus",
-      short: "Short Break",
-      long: "Long Break",
+    const modeKeyMap = {
+      focus: "modeFocus",
+      short: "modeShortBreak",
+      long: "modeLongBreak",
     };
 
-    const currentModeName = modeNames[currentMode] || currentMode;
-    const newModeName = modeNames[mode] || mode;
+    const currentModeKey = modeKeyMap[currentMode] || "modeFocus";
+    const newModeKey = modeKeyMap[mode] || "modeFocus";
 
-    const confirmed = confirm(
-      `⏰ Timer is running!\n\nAre you sure you want to switch from "${currentModeName}" to "${newModeName}"?\n\nThe current timer will be stopped and reset.`
-    );
+    const currentModeName = languageManager.t(currentModeKey);
+    const newModeName = languageManager.t(newModeKey);
+
+    const message = `⏰ ${languageManager.t(
+      "timerIsRunning"
+    )}\n\n${languageManager.t("confirmSwitchMode", {
+      currentMode: currentModeName,
+      newMode: newModeName,
+    })}\n\n${languageManager.t("timerWillReset")}`;
+    const confirmed = confirm(message);
 
     if (!confirmed) {
       return; // User cancelled, keep current mode
@@ -186,6 +193,12 @@ function openSettings() {
   document.getElementById("focusTime").value = settings.focus;
   document.getElementById("shortBreakTime").value = settings.short;
   document.getElementById("longBreakTime").value = settings.long;
+
+  // Set current language in selector
+  const languageSelect = document.getElementById("languageSelect");
+  if (languageSelect) {
+    languageSelect.value = languageManager.getCurrentLanguage();
+  }
 }
 
 function closeSettings() {
@@ -219,6 +232,16 @@ document.querySelectorAll(".mode-btn").forEach((btn) => {
     changeMode(btn.dataset.mode);
   });
 });
+
+// Language selector change handler
+const languageSelect = document.getElementById("languageSelect");
+if (languageSelect) {
+  languageSelect.addEventListener("change", async (e) => {
+    const selectedLang = e.target.value;
+    await languageManager.setLanguage(selectedLang);
+    // Page will reload automatically in setLanguage for index.html
+  });
+}
 
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
