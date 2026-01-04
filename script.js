@@ -11,6 +11,10 @@ let settings = {
   long: 15,
 };
 
+// Tasks management
+let tasks = [];
+let editingTaskId = null;
+
 // Load initial state from background
 loadStateFromBackground();
 
@@ -222,6 +226,40 @@ document.getElementById("overlay").addEventListener("click", closeSettings);
 document.getElementById("saveBtn").addEventListener("click", saveSettings);
 document.getElementById("cancelBtn").addEventListener("click", closeSettings);
 
+// Tasks panel event listeners
+const tasksIcon = document.getElementById("tasksIcon");
+const tasksPanel = document.getElementById("tasksPanel");
+const tasksOverlay = document.getElementById("tasksOverlay");
+const closeTasksBtn = document.getElementById("closeTasksBtn");
+
+if (tasksIcon) {
+  tasksIcon.addEventListener("click", openTasksPanel);
+}
+
+if (closeTasksBtn) {
+  closeTasksBtn.addEventListener("click", closeTasksPanel);
+}
+
+if (tasksOverlay) {
+  tasksOverlay.addEventListener("click", closeTasksPanel);
+}
+
+async function openTasksPanel() {
+  if (tasksPanel && tasksOverlay) {
+    tasksPanel.classList.add("show");
+    tasksOverlay.classList.add("show");
+    await loadTasks(); // Refresh tasks when opening
+  }
+}
+
+function closeTasksPanel() {
+  if (tasksPanel && tasksOverlay) {
+    tasksPanel.classList.remove("show");
+    tasksOverlay.classList.remove("show");
+    hideAddTaskInput();
+  }
+}
+
 document.querySelectorAll(".mode-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     changeMode(btn.dataset.mode);
@@ -270,8 +308,229 @@ setInterval(() => {
   loadStateFromBackground();
 }, 1000);
 
+// Tasks Management Functions
+async function loadTasks() {
+  try {
+    const data = await chrome.storage.local.get(["tasks"]);
+    if (data.tasks) {
+      tasks = data.tasks;
+    } else {
+      tasks = [];
+    }
+    renderTasks();
+  } catch (error) {
+    console.error("Error loading tasks:", error);
+    tasks = [];
+    renderTasks();
+  }
+}
+
+async function saveTasks() {
+  try {
+    await chrome.storage.local.set({ tasks });
+  } catch (error) {
+    console.error("Error saving tasks:", error);
+  }
+}
+
+function renderTasks() {
+  const tasksList = document.getElementById("tasksList");
+  if (!tasksList) return;
+
+  if (tasks.length === 0) {
+    tasksList.innerHTML = `<div style="text-align: center; color: rgba(255, 255, 255, 0.5); padding: 40px 20px; font-size: 14px;" data-i18n="noTasks">No tasks yet. Add one to get started!</div>`;
+    if (typeof languageManager !== "undefined") {
+      languageManager.applyTranslations();
+    }
+    updateTasksBadge();
+    return;
+  }
+
+  tasksList.innerHTML = tasks
+    .map(
+      (task) => `
+    <div class="task-item ${task.completed ? "completed" : ""}" data-task-id="${
+        task.id
+      }">
+      <div class="task-checkbox ${
+        task.completed ? "checked" : ""
+      }" data-action="toggle" data-task-id="${task.id}"></div>
+      <div class="task-text">${escapeHtml(task.text)}</div>
+      <button class="task-delete-btn" data-action="delete" data-task-id="${
+        task.id
+      }" title="Delete">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  `
+    )
+    .join("");
+
+  // Add event listeners
+  tasksList.querySelectorAll("[data-action='toggle']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const taskId = e.target.getAttribute("data-task-id");
+      toggleTask(taskId);
+    });
+  });
+
+  tasksList.querySelectorAll("[data-action='delete']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const taskId = e.target
+        .closest("[data-task-id]")
+        .getAttribute("data-task-id");
+      deleteTask(taskId);
+    });
+  });
+
+  updateTasksBadge();
+}
+
+function updateTasksBadge() {
+  const badge = document.getElementById("tasksBadge");
+  const incompleteTasks = tasks.filter((t) => !t.completed).length;
+  if (badge) {
+    if (incompleteTasks > 0) {
+      badge.textContent = incompleteTasks;
+      badge.style.display = "flex";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function toggleTask(taskId) {
+  const task = tasks.find((t) => t.id === taskId);
+  if (task) {
+    task.completed = !task.completed;
+    saveTasks();
+    renderTasks();
+  }
+}
+
+function deleteTask(taskId) {
+  tasks = tasks.filter((t) => t.id !== taskId);
+  saveTasks();
+  renderTasks();
+}
+
+function showAddTaskInput() {
+  const container = document.getElementById("taskInputContainer");
+  const input = document.getElementById("taskInput");
+  if (container && input) {
+    container.style.display = "block";
+    input.value = "";
+    editingTaskId = null;
+    input.focus();
+  }
+}
+
+function hideAddTaskInput() {
+  const container = document.getElementById("taskInputContainer");
+  const input = document.getElementById("taskInput");
+  if (container && input) {
+    container.style.display = "none";
+    input.value = "";
+    editingTaskId = null;
+  }
+}
+
+function addTask() {
+  const input = document.getElementById("taskInput");
+  if (!input) return;
+
+  const text = input.value.trim();
+  if (!text) {
+    hideAddTaskInput();
+    return;
+  }
+
+  if (editingTaskId) {
+    // Edit existing task
+    const task = tasks.find((t) => t.id === editingTaskId);
+    if (task) {
+      task.text = text;
+    }
+  } else {
+    // Add new task
+    const newTask = {
+      id: Date.now().toString(),
+      text: text,
+      completed: false,
+      createdAt: Date.now(),
+    };
+    tasks.push(newTask);
+  }
+
+  saveTasks();
+  renderTasks();
+  hideAddTaskInput();
+}
+
+// Initialize tasks when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    loadTasks();
+    initTaskEvents();
+  });
+} else {
+  loadTasks();
+  initTaskEvents();
+}
+
+function initTaskEvents() {
+  const addTaskBtn = document.getElementById("addTaskBtn");
+  const saveTaskBtn = document.getElementById("saveTaskBtn");
+  const cancelTaskBtn = document.getElementById("cancelTaskBtn");
+  const taskInput = document.getElementById("taskInput");
+
+  if (addTaskBtn) {
+    addTaskBtn.addEventListener("click", showAddTaskInput);
+  }
+
+  if (saveTaskBtn) {
+    saveTaskBtn.addEventListener("click", addTask);
+  }
+
+  if (cancelTaskBtn) {
+    cancelTaskBtn.addEventListener("click", hideAddTaskInput);
+  }
+
+  if (taskInput) {
+    taskInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        addTask();
+      } else if (e.key === "Escape") {
+        hideAddTaskInput();
+      }
+    });
+  }
+}
+
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
+  // Don't trigger shortcuts when user is typing in input fields
+  const activeElement = document.activeElement;
+  const isInputFocused =
+    activeElement &&
+    (activeElement.tagName === "INPUT" ||
+      activeElement.tagName === "TEXTAREA" ||
+      activeElement.isContentEditable);
+
+  if (isInputFocused) {
+    return; // Allow normal input behavior
+  }
+
   if (e.code === "Space") {
     e.preventDefault();
     toggleTimer();

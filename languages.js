@@ -41,6 +41,12 @@ const translations = {
 
     // Alert
     confirmSwitch: "Are you sure you want to switch mode?",
+
+    // Tasks
+    dailyTasks: "Daily Tasks",
+    enterTask: "Enter task...",
+    noTasks: "No tasks yet. Add one to get started!",
+    addTask: "Add Task",
   },
 
   vi: {
@@ -81,6 +87,12 @@ const translations = {
 
     // Alert
     confirmSwitch: "Bạn có chắc muốn chuyển chế độ?",
+
+    // Tasks
+    dailyTasks: "Công việc hàng ngày",
+    enterTask: "Nhập công việc...",
+    noTasks: "Chưa có công việc nào. Thêm một công việc để bắt đầu!",
+    addTask: "Thêm công việc",
   },
 
   de: {
@@ -121,5 +133,11 @@ const translations = {
 
     // Alert
     confirmSwitch: "Möchten Sie wirklich den Modus wechseln?",
+
+    // Tasks
+    dailyTasks: "Tägliche Aufgaben",
+    enterTask: "Aufgabe eingeben...",
+    noTasks: "Noch keine Aufgaben. Fügen Sie eine hinzu, um zu beginnen!",
+    addTask: "Aufgabe hinzufügen",
   },
 };
