@@ -1,6 +1,6 @@
+// State will be synced from background
 let timeLeft = 30 * 60;
 let isRunning = false;
-let interval = null;
 let currentMode = "focus";
 let sessions = 0;
 let totalMinutes = 0;
@@ -10,6 +10,9 @@ let settings = {
   short: 5,
   long: 15,
 };
+
+// Load initial state from background
+loadStateFromBackground();
 
 // Load background image
 async function loadBackground() {
@@ -63,74 +66,61 @@ function updateDisplay() {
 }
 
 function toggleTimer() {
-  isRunning = !isRunning;
+  // Send toggle request to background
+  chrome.runtime.sendMessage({ action: "toggle" });
+}
 
+// Load state from background
+async function loadStateFromBackground() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: "getState" });
+    if (response) {
+      timeLeft = response.timeLeft || 30 * 60;
+      isRunning = response.isRunning || false;
+      currentMode = response.currentMode || "focus";
+      sessions = response.sessions || 0;
+      totalMinutes = response.totalTime || 0;
+      if (response.settings) {
+        settings = { ...settings, ...response.settings };
+      }
+
+      updateDisplay();
+      updateUI();
+      updateStats();
+    }
+  } catch (error) {
+    console.error("Error loading state:", error);
+  }
+}
+
+// Update UI based on current state
+function updateUI() {
   if (isRunning) {
     document.getElementById("playIcon").style.display = "none";
     document.getElementById("pauseIcon").style.display = "block";
-    startTimer();
   } else {
     document.getElementById("playIcon").style.display = "block";
     document.getElementById("pauseIcon").style.display = "none";
-    clearInterval(interval);
+  }
+
+  // Update mode buttons
+  document.querySelectorAll(".mode-btn").forEach((btn) => {
+    btn.classList.remove("active");
+  });
+  const activeBtn = document.querySelector(`[data-mode="${currentMode}"]`);
+  if (activeBtn) {
+    activeBtn.classList.add("active");
   }
 }
 
-function startTimer() {
-  // If timer is at 0, reset to the current mode's default time
-  if (timeLeft <= 0) {
-    timeLeft = settings[currentMode] * 60;
-    updateDisplay();
-  }
-
-  const startTime = Date.now();
-  const initialTimeLeft = timeLeft;
-
-  interval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    timeLeft = initialTimeLeft - elapsed;
-
-    if (timeLeft < 0) timeLeft = 0;
-
-    updateDisplay();
-
-    if (timeLeft <= 0) {
-      clearInterval(interval);
-      isRunning = false;
-      document.getElementById("playIcon").style.display = "block";
-      document.getElementById("pauseIcon").style.display = "none";
-
-      playSound();
-
-      if (currentMode === "focus") {
-        sessions++;
-        totalMinutes += settings.focus;
-        document.getElementById("sessions").textContent = sessions;
-        document.getElementById("totalTime").textContent = totalMinutes;
-      }
-
-      if (Notification.permission === "granted") {
-        new Notification(`⏰ ${languageManager.t("focusTimer")}`, {
-          body: languageManager.t("timeIsUp"),
-          icon: "https://cdn-icons-png.flaticon.com/512/2935/2935323.png",
-        });
-      }
-      alert(`⏰ ${languageManager.t("timeIsUp")}`);
-
-      // Reset timer to default time for the current mode after session ends
-      timeLeft = settings[currentMode] * 60;
-      updateDisplay();
-    }
-  }, 100);
+function updateStats() {
+  document.getElementById("sessions").textContent = sessions;
+  document.getElementById("totalTime").textContent = totalMinutes;
 }
 
 function resetTimer() {
-  clearInterval(interval);
-  isRunning = false;
-  document.getElementById("playIcon").style.display = "block";
-  document.getElementById("pauseIcon").style.display = "none";
-  timeLeft = settings[currentMode] * 60;
-  updateDisplay();
+  // Send reset request to background
+  chrome.runtime.sendMessage({ action: "reset" });
 }
 
 function changeMode(mode) {
@@ -166,18 +156,8 @@ function changeMode(mode) {
     }
   }
 
-  clearInterval(interval);
-  isRunning = false;
-  document.getElementById("playIcon").style.display = "block";
-  document.getElementById("pauseIcon").style.display = "none";
-  currentMode = mode;
-  timeLeft = settings[mode] * 60;
-  updateDisplay();
-
-  document.querySelectorAll(".mode-btn").forEach((btn) => {
-    btn.classList.remove("active");
-  });
-  document.querySelector(`[data-mode="${mode}"]`).classList.add("active");
+  // Send change mode request to background
+  chrome.runtime.sendMessage({ action: "changeMode", mode });
 }
 
 function playSound() {
@@ -187,7 +167,17 @@ function playSound() {
   audio.play().catch((e) => console.log("Audio play failed:", e));
 }
 
-function openSettings() {
+async function openSettings() {
+  // Load latest settings from background
+  try {
+    const response = await chrome.runtime.sendMessage({ action: "getState" });
+    if (response && response.settings) {
+      settings = { ...settings, ...response.settings };
+    }
+  } catch (error) {
+    console.error("Error loading settings:", error);
+  }
+
   document.getElementById("settingsPanel").classList.add("show");
   document.getElementById("overlay").classList.add("show");
   document.getElementById("focusTime").value = settings.focus;
@@ -207,15 +197,20 @@ function closeSettings() {
 }
 
 function saveSettings() {
-  settings.focus = parseInt(document.getElementById("focusTime").value);
-  settings.short = parseInt(document.getElementById("shortBreakTime").value);
-  settings.long = parseInt(document.getElementById("longBreakTime").value);
+  const newSettings = {
+    focus: parseInt(document.getElementById("focusTime").value),
+    short: parseInt(document.getElementById("shortBreakTime").value),
+    long: parseInt(document.getElementById("longBreakTime").value),
+  };
 
-  if (currentMode === "focus") timeLeft = settings.focus * 60;
-  else if (currentMode === "short") timeLeft = settings.short * 60;
-  else timeLeft = settings.long * 60;
+  settings = { ...settings, ...newSettings };
 
-  updateDisplay();
+  // Send settings update to background
+  chrome.runtime.sendMessage({
+    action: "updateSettings",
+    settings: newSettings,
+  });
+
   closeSettings();
 }
 
@@ -242,6 +237,38 @@ if (languageSelect) {
     // Page will reload automatically in setLanguage for index.html
   });
 }
+
+// Listen for updates from background
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === "updateDisplay") {
+    timeLeft = message.timeLeft || timeLeft;
+    isRunning = message.isRunning !== undefined ? message.isRunning : isRunning;
+    if (message.currentMode) currentMode = message.currentMode;
+    if (message.sessions !== undefined) sessions = message.sessions;
+    if (message.totalTime !== undefined) totalMinutes = message.totalTime;
+
+    updateDisplay();
+    updateUI();
+    updateStats();
+
+    // Handle timer completion
+    if (timeLeft <= 0 && !isRunning) {
+      playSound();
+      if (Notification.permission === "granted") {
+        new Notification(`⏰ ${languageManager.t("focusTimer")}`, {
+          body: languageManager.t("timeIsUp"),
+          icon: "https://cdn-icons-png.flaticon.com/512/2935/2935323.png",
+        });
+      }
+      alert(`⏰ ${languageManager.t("timeIsUp")}`);
+    }
+  }
+});
+
+// Periodically sync with background (every second)
+setInterval(() => {
+  loadStateFromBackground();
+}, 1000);
 
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
