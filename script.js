@@ -18,10 +18,29 @@ let editingTaskId = null;
 // Load initial state from background
 loadStateFromBackground();
 
-// Load background image
-async function loadBackground() {
+// Load background image from storage or load new one on first use
+async function loadSavedBackground() {
   try {
-    // Get API key from config (must be loaded before this script)
+    const data = await chrome.storage.local.get(["backgroundImage"]);
+    if (data.backgroundImage) {
+      // Use saved background
+      document.body.style.backgroundImage = `url('${data.backgroundImage}')`;
+    } else {
+      // First time use - load a background image
+      await loadInitialBackground();
+    }
+  } catch (error) {
+    console.error("Error loading saved background:", error);
+    // Fallback to default gradient
+    document.body.style.backgroundImage =
+      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+  }
+}
+
+// Load initial background image (first time use, doesn't count toward limit)
+async function loadInitialBackground() {
+  try {
+    // Get API key from config
     const apiKey =
       typeof CONFIG !== "undefined" && CONFIG.UNSPLASH_API_KEY
         ? CONFIG.UNSPLASH_API_KEY
@@ -39,18 +58,94 @@ async function loadBackground() {
         },
       }
     );
-    const data = await response.json();
-    const imageUrl = data.urls.regular;
+    const photoData = await response.json();
+    const imageUrl = photoData.urls.regular;
+
+    // Update background
     document.body.style.backgroundImage = `url('${imageUrl}')`;
+
+    // Save background (but don't update change count - this is initial load)
+    await chrome.storage.local.set({
+      backgroundImage: imageUrl,
+    });
   } catch (error) {
-    console.error("Error loading background:", error);
-    // Fallback to a default background
+    console.error("Error loading initial background:", error);
+    // Fallback to default gradient
     document.body.style.backgroundImage =
       "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
   }
 }
 
-loadBackground();
+// Change background image (limited to 5 times per day)
+async function changeBackground() {
+  try {
+    // Check daily limit
+    const data = await chrome.storage.local.get([
+      "backgroundChangeCount",
+      "backgroundChangeDate",
+    ]);
+
+    const today = new Date().toDateString();
+    const lastChangeDate = data.backgroundChangeDate || "";
+    let changeCount = data.backgroundChangeCount || 0;
+
+    // Reset count if it's a new day
+    if (lastChangeDate !== today) {
+      changeCount = 0;
+    }
+
+    // Check if limit exceeded
+    if (changeCount >= 5) {
+      const limitMessage =
+        typeof languageManager !== "undefined"
+          ? languageManager.t("backgroundLimitReached")
+          : "You have reached the daily limit of 5 background changes. Please try again tomorrow.";
+      alert(limitMessage);
+      return;
+    }
+
+    // Get API key from config
+    const apiKey =
+      typeof CONFIG !== "undefined" && CONFIG.UNSPLASH_API_KEY
+        ? CONFIG.UNSPLASH_API_KEY
+        : null;
+
+    if (!apiKey) {
+      throw new Error("Unsplash API key not found. Please check config.js");
+    }
+
+    const response = await fetch(
+      "https://api.unsplash.com/photos/random?query=landscape",
+      {
+        headers: {
+          Authorization: `Client-ID ${apiKey}`,
+        },
+      }
+    );
+    const photoData = await response.json();
+    const imageUrl = photoData.urls.regular;
+
+    // Update background
+    document.body.style.backgroundImage = `url('${imageUrl}')`;
+
+    // Save background and update count
+    await chrome.storage.local.set({
+      backgroundImage: imageUrl,
+      backgroundChangeCount: changeCount + 1,
+      backgroundChangeDate: today,
+    });
+  } catch (error) {
+    console.error("Error changing background:", error);
+    const errorMessage =
+      typeof languageManager !== "undefined"
+        ? languageManager.t("backgroundChangeError")
+        : "Error changing background. Please try again.";
+    alert(errorMessage);
+  }
+}
+
+// Load saved background on page load
+loadSavedBackground();
 
 // Request notification permission
 if ("Notification" in window && Notification.permission === "default") {
@@ -225,6 +320,12 @@ document.getElementById("settingsIcon").addEventListener("click", openSettings);
 document.getElementById("overlay").addEventListener("click", closeSettings);
 document.getElementById("saveBtn").addEventListener("click", saveSettings);
 document.getElementById("cancelBtn").addEventListener("click", closeSettings);
+
+// Change background button
+const changeBgBtn = document.getElementById("changeBgBtn");
+if (changeBgBtn) {
+  changeBgBtn.addEventListener("click", changeBackground);
+}
 
 // Tasks panel event listeners
 const tasksIcon = document.getElementById("tasksIcon");

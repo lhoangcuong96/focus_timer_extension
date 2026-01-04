@@ -47,6 +47,12 @@ const translations = {
     enterTask: "Enter task...",
     noTasks: "No tasks yet. Add one to get started!",
     addTask: "Add Task",
+
+    // Background
+    changeBackground: "Change Background",
+    backgroundLimitReached:
+      "You have reached the daily limit of 5 background changes. Please try again tomorrow.",
+    backgroundChangeError: "Error changing background. Please try again.",
   },
 
   vi: {
@@ -93,6 +99,12 @@ const translations = {
     enterTask: "Nhập công việc...",
     noTasks: "Chưa có công việc nào. Thêm một công việc để bắt đầu!",
     addTask: "Thêm công việc",
+
+    // Background
+    changeBackground: "Đổi hình nền",
+    backgroundLimitReached:
+      "Bạn đã đạt giới hạn 5 lần đổi hình nền mỗi ngày. Vui lòng thử lại vào ngày mai.",
+    backgroundChangeError: "Lỗi khi đổi hình nền. Vui lòng thử lại.",
   },
 
   de: {
@@ -139,5 +151,11 @@ const translations = {
     enterTask: "Aufgabe eingeben...",
     noTasks: "Noch keine Aufgaben. Fügen Sie eine hinzu, um zu beginnen!",
     addTask: "Aufgabe hinzufügen",
+
+    // Background
+    changeBackground: "Hintergrund ändern",
+    backgroundLimitReached:
+      "Sie haben das tägliche Limit von 5 Hintergrundänderungen erreicht. Bitte versuchen Sie es morgen erneut.",
+    backgroundChangeError: "Fehler beim Ändern des Hintergrunds. Bitte versuchen Sie es erneut.",
   },
 };
