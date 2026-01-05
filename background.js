@@ -10,10 +10,11 @@ let settings = {
   short: 5,
   long: 15,
 };
+let blockedSites = [];
 
 // Load saved state
 chrome.storage.local.get(
-  ["timeLeft", "isRunning", "sessions", "totalTime", "currentMode", "settings"],
+  ["timeLeft", "isRunning", "sessions", "totalTime", "currentMode", "settings", "blockedSites"],
   (data) => {
     if (data.timeLeft !== undefined) timeLeft = data.timeLeft;
     if (data.isRunning !== undefined) isRunning = data.isRunning;
@@ -22,6 +23,9 @@ chrome.storage.local.get(
     if (data.currentMode !== undefined) currentMode = data.currentMode;
     if (data.settings) {
       settings = { ...settings, ...data.settings };
+    }
+    if (data.blockedSites) {
+      blockedSites = data.blockedSites;
     }
 
     // If timer was running, recalculate timeLeft based on elapsed time
@@ -34,9 +38,115 @@ chrome.storage.local.get(
       }
     }
 
+    // Update blocking rules based on current state
+    updateBlockingRules();
     notifyUpdate();
   }
 );
+
+// Website Blocking Functions
+async function enableBlocking() {
+  if (blockedSites.length === 0) return;
+
+  // Create rules for both root domain and subdomains
+  const rules = [];
+  blockedSites.forEach((site, index) => {
+    // Rule for root domain (e.g., facebook.com)
+    rules.push({
+      id: index * 2 + 1,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        urlFilter: `*://${site}/*`,
+        resourceTypes: ["main_frame"]
+      }
+    });
+    
+    // Rule for subdomains (e.g., www.facebook.com, m.facebook.com)
+    rules.push({
+      id: index * 2 + 2,
+      priority: 1,
+      action: { type: "block" },
+      condition: {
+        urlFilter: `*://*.${site}/*`,
+        resourceTypes: ["main_frame"]
+      }
+    });
+  });
+
+  try {
+    // Get existing dynamic rules to avoid conflicts
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+    const existingIds = existingRules.map(rule => rule.id);
+    
+    await chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: existingIds,
+      addRules: rules
+    });
+    console.log("Blocking enabled for:", blockedSites);
+  } catch (error) {
+    console.error("Error enabling blocking:", error);
+  }
+}
+
+async function disableBlocking() {
+  try {
+    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
+    const existingIds = existingRules.map(rule => rule.id);
+    
+    if (existingIds.length > 0) {
+      await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existingIds,
+        addRules: []
+      });
+      console.log("Blocking disabled");
+    }
+  } catch (error) {
+    console.error("Error disabling blocking:", error);
+  }
+}
+
+async function updateBlockingRules() {
+  // Only block if timer is running AND in focus mode
+  if (isRunning && currentMode === "focus") {
+    await enableBlocking();
+  } else {
+    await disableBlocking();
+  }
+}
+
+async function addBlockedSite(site) {
+  // Normalize the site (remove protocol, www, trailing slashes)
+  const normalizedSite = site
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '')
+    .toLowerCase();
+  
+  if (!normalizedSite || blockedSites.includes(normalizedSite)) {
+    return { success: false, message: "Site already blocked or invalid" };
+  }
+  
+  blockedSites.push(normalizedSite);
+  await saveBlockedSites();
+  await updateBlockingRules();
+  return { success: true, sites: blockedSites };
+}
+
+async function removeBlockedSite(site) {
+  const index = blockedSites.indexOf(site);
+  if (index > -1) {
+    blockedSites.splice(index, 1);
+    await saveBlockedSites();
+    await updateBlockingRules();
+    return { success: true, sites: blockedSites };
+  }
+  return { success: false, message: "Site not found" };
+}
+
+async function saveBlockedSites() {
+  await chrome.storage.local.set({ blockedSites });
+}
 
 // Timer logic
 function startTimer() {
@@ -54,6 +164,7 @@ function startTimer() {
     periodInMinutes: 1 / 60,
   });
   saveState();
+  updateBlockingRules();
   notifyUpdate();
 }
 
@@ -61,6 +172,7 @@ function stopTimer() {
   isRunning = false;
   chrome.alarms.clear("focusTimer");
   saveState();
+  updateBlockingRules();
 }
 
 function resetTimer() {
@@ -75,6 +187,7 @@ function changeMode(mode) {
   currentMode = mode;
   timeLeft = settings[mode] * 60;
   saveState();
+  updateBlockingRules();
   notifyUpdate();
 }
 
@@ -118,6 +231,7 @@ function saveState() {
     totalTime,
     currentMode,
     settings,
+    blockedSites,
     startTime: isRunning ? startTime : null,
     initialTimeLeft: isRunning ? initialTimeLeft : null,
   });
@@ -169,6 +283,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     changeMode(message.mode);
   } else if (message.action === "updateSettings") {
     updateSettings(message.settings);
+  } else if (message.action === "addBlockedSite") {
+    addBlockedSite(message.site).then(result => {
+      sendResponse(result);
+    });
+    return true; // Keep channel open for async response
+  } else if (message.action === "removeBlockedSite") {
+    removeBlockedSite(message.site).then(result => {
+      sendResponse(result);
+    });
+    return true; // Keep channel open for async response
+  } else if (message.action === "getBlockedSites") {
+    sendResponse({ sites: blockedSites });
   } else if (message.action === "getState") {
     sendResponse({
       timeLeft,
@@ -177,7 +303,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       totalTime,
       currentMode,
       settings,
+      blockedSites,
     });
   }
   return true;
+});
+
+// Context Menu
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "blockSite",
+    title: "Block this site",
+    contexts: ["page"],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "blockSite") {
+    try {
+      const url = new URL(tab.url);
+      const domain = url.hostname;
+      addBlockedSite(domain).then((result) => {
+        if (result.success) {
+          // Show notification
+          chrome.notifications.create({
+            type: "basic",
+            iconUrl: "icons/icon128.png",
+            title: "Focus Timer",
+            message: `Blocked ${domain}`,
+            priority: 2,
+          });
+        }
+      });
+    } catch (e) {
+      console.error("Invalid URL:", e);
+    }
+  }
 });

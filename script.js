@@ -618,6 +618,166 @@ function initTaskEvents() {
   }
 }
 
+// Blocked Sites Management Functions
+let blockedSites = [];
+
+async function loadBlockedSites() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: "getState" });
+    if (response && response.blockedSites) {
+      blockedSites = response.blockedSites;
+    } else {
+      blockedSites = [];
+    }
+    renderBlockedSites();
+  } catch (error) {
+    console.error("Error loading blocked sites:", error);
+    blockedSites = [];
+    renderBlockedSites();
+  }
+}
+
+function renderBlockedSites() {
+  const blockedSitesList = document.getElementById("blockedSitesList");
+  if (!blockedSitesList) return;
+
+  if (blockedSites.length === 0) {
+    blockedSitesList.innerHTML = `<div style="text-align: center; color: rgba(255, 255, 255, 0.5); padding: 20px; font-size: 13px;">No blocked sites yet</div>`;
+    return;
+  }
+
+  blockedSitesList.innerHTML = blockedSites
+    .map(
+      (site) => `
+    <div class="blocked-site-item">
+      <div class="blocked-site-name">${escapeHtml(site)}</div>
+      <button class="blocked-site-remove-btn" data-site="${escapeHtml(site)}" title="Remove">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  `
+    )
+    .join("");
+
+  // Add event listeners to remove buttons
+  blockedSitesList.querySelectorAll(".blocked-site-remove-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const site = e.currentTarget.getAttribute("data-site");
+      await removeBlockedSiteFromList(site);
+    });
+  });
+}
+
+function addCurrentSiteToList() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs && tabs[0] && tabs[0].url) {
+      try {
+        const url = new URL(tabs[0].url);
+        // Only allow adding HTTP/HTTPS sites
+        if (url.protocol.startsWith('http')) {
+          const domain = url.hostname;
+          
+          // Populate input first to let user review/edit if needed
+          const input = document.getElementById("blockedSiteInput");
+          if (input) {
+            input.value = domain;
+            // Trigger add
+            addBlockedSiteToList();
+          }
+        } else {
+           alert("Cannot block this type of page");
+        }
+      } catch (e) {
+        console.error("Invalid URL:", e);
+      }
+    }
+  });
+}
+
+async function addBlockedSiteToList() {
+  const input = document.getElementById("blockedSiteInput");
+  if (!input) return;
+
+  const site = input.value.trim();
+  if (!site) {
+    return;
+  }
+
+  // Basic validation
+  if (site.includes(" ") || site.length < 3) {
+    alert(languageManager.t("invalidDomain"));
+    return;
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: "addBlockedSite",
+      site: site,
+    });
+
+    if (response && response.success) {
+      blockedSites = response.sites;
+      renderBlockedSites();
+      input.value = "";
+    } else {
+      alert(languageManager.t("siteAlreadyBlocked"));
+    }
+  } catch (error) {
+    console.error("Error adding blocked site:", error);
+    alert("Error adding site. Please try again.");
+  }
+}
+
+async function removeBlockedSiteFromList(site) {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: "removeBlockedSite",
+      site: site,
+    });
+
+    if (response && response.success) {
+      blockedSites = response.sites;
+      renderBlockedSites();
+    }
+  } catch (error) {
+    console.error("Error removing blocked site:", error);
+    alert("Error removing site. Please try again.");
+  }
+}
+
+// Initialize blocked sites when settings panel opens
+const originalOpenSettings = openSettings;
+openSettings = async function() {
+  await originalOpenSettings();
+  await loadBlockedSites();
+};
+
+// Add event listener for add blocked site button
+const addBlockedSiteBtn = document.getElementById("addBlockedSiteBtn");
+if (addBlockedSiteBtn) {
+  addBlockedSiteBtn.addEventListener("click", addBlockedSiteToList);
+}
+
+// Add event listener for add current site button
+const addCurrentSiteBtn = document.getElementById("addCurrentSiteBtn");
+if (addCurrentSiteBtn) {
+  addCurrentSiteBtn.addEventListener("click", addCurrentSiteToList);
+}
+
+// Add event listener for Enter key in blocked site input
+const blockedSiteInput = document.getElementById("blockedSiteInput");
+if (blockedSiteInput) {
+  blockedSiteInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      addBlockedSiteToList();
+    }
+  });
+}
+
 // Keyboard shortcuts
 document.addEventListener("keydown", (e) => {
   // Don't trigger shortcuts when user is typing in input fields

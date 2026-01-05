@@ -53,6 +53,15 @@ const translations = {
     backgroundLimitReached:
       "You have reached the daily limit of 5 background changes. Please try again tomorrow.",
     backgroundChangeError: "Error changing background. Please try again.",
+
+    // Blocked Sites
+    blockedWebsites: "Blocked Websites",
+    enterWebsite: "example.com",
+    add: "Add",
+    blockedSitesHelp: "Enter domain names (e.g., facebook.com, youtube.com). Sites will be blocked during focus sessions.",
+    invalidDomain: "Please enter a valid domain name.",
+    siteAlreadyBlocked: "This site is already in the blocked list.",
+    addCurrentSite: "Add Current Site",
   },
 
   vi: {
@@ -105,6 +114,15 @@ const translations = {
     backgroundLimitReached:
       "Bạn đã đạt giới hạn 5 lần đổi hình nền mỗi ngày. Vui lòng thử lại vào ngày mai.",
     backgroundChangeError: "Lỗi khi đổi hình nền. Vui lòng thử lại.",
+
+    // Blocked Sites
+    blockedWebsites: "Trang web bị chặn",
+    enterWebsite: "example.com",
+    add: "Thêm",
+    blockedSitesHelp: "Nhập tên miền (ví dụ: facebook.com, youtube.com). Các trang web sẽ bị chặn trong phiên tập trung.",
+    invalidDomain: "Vui lòng nhập tên miền hợp lệ.",
+    siteAlreadyBlocked: "Trang web này đã có trong danh sách chặn.",
+    addCurrentSite: "Thêm trang hiện tại",
   },
 
   de: {
@@ -157,5 +175,14 @@ const translations = {
     backgroundLimitReached:
       "Sie haben das tägliche Limit von 5 Hintergrundänderungen erreicht. Bitte versuchen Sie es morgen erneut.",
     backgroundChangeError: "Fehler beim Ändern des Hintergrunds. Bitte versuchen Sie es erneut.",
+
+    // Blocked Sites
+    blockedWebsites: "Blockierte Websites",
+    enterWebsite: "example.com",
+    add: "Hinzufügen",
+    blockedSitesHelp: "Geben Sie Domainnamen ein (z.B. facebook.com, youtube.com). Websites werden während Fokussitzungen blockiert.",
+    invalidDomain: "Bitte geben Sie einen gültigen Domainnamen ein.",
+    siteAlreadyBlocked: "Diese Website ist bereits in der Sperrliste.",
+    addCurrentSite: "Aktuelle Seite hinzufügen",
   },
 };

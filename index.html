@@ -145,6 +145,30 @@
             <input type="number" id="longBreakTime" value="15" min="1" max="60">
         </div>
         <div class="setting-item">
+            <label data-i18n="blockedWebsites">Blocked Websites:</label>
+            <div class="blocked-sites-container">
+                <div class="blocked-sites-input">
+                    <input type="text" id="blockedSiteInput" placeholder="example.com"
+                        data-i18n-placeholder="enterWebsite">
+                    <button id="addBlockedSiteBtn" class="btn-add-site" data-i18n="add">Add</button>
+                </div>
+                <button id="addCurrentSiteBtn" class="btn-add-current"
+                    style="width: 100%; margin-bottom: 12px; font-size: 13px; background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    <span data-i18n="addCurrentSite">Add Current Site</span>
+                </button>
+                <div class="blocked-sites-list" id="blockedSitesList">
+                    <!-- Dynamically populated -->
+                </div>
+                <small style="opacity: 0.7; font-size: 12px; margin-top: 8px; display: block;"
+                    data-i18n="blockedSitesHelp">
+                    Enter domain names (e.g., facebook.com, youtube.com). Sites will be blocked during focus sessions.
+                </small>
+            </div>
+        </div>
+        <div class="setting-item">
             <label data-i18n="language">Language:</label>
             <select id="languageSelect"
                 style="width: 100%; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.08); color: white; border-radius: 12px; font-size: 16px; cursor: pointer;">

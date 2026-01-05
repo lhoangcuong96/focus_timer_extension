@@ -7,7 +7,13 @@
     "permissions": [
       "notifications",
       "storage",
-      "alarms"
+      "alarms",
+      "declarativeNetRequest",
+      "declarativeNetRequestFeedback",
+      "contextMenus"
+    ],
+    "host_permissions": [
+      "<all_urls>"
     ],
     "action": {
       "default_popup": "popup.html",
