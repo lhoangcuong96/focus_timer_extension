@@ -62,6 +62,7 @@ const translations = {
     invalidDomain: "Please enter a valid domain name.",
     siteAlreadyBlocked: "This site is already in the blocked list.",
     addCurrentSite: "Add Current Site",
+    blockedSitesBtn: "Blocked Websites",
   },
 
   vi: {
@@ -123,6 +124,7 @@ const translations = {
     invalidDomain: "Vui lòng nhập tên miền hợp lệ.",
     siteAlreadyBlocked: "Trang web này đã có trong danh sách chặn.",
     addCurrentSite: "Thêm trang hiện tại",
+    blockedSitesBtn: "Trang bị chặn",
   },
 
   de: {
@@ -184,5 +186,6 @@ const translations = {
     invalidDomain: "Bitte geben Sie einen gültigen Domainnamen ein.",
     siteAlreadyBlocked: "Diese Website ist bereits in der Sperrliste.",
     addCurrentSite: "Aktuelle Seite hinzufügen",
+    blockedSitesBtn: "Blockierte Websites",
   },
 };

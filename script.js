@@ -750,11 +750,8 @@ async function removeBlockedSiteFromList(site) {
 }
 
 // Initialize blocked sites when settings panel opens
-const originalOpenSettings = openSettings;
-openSettings = async function() {
-  await originalOpenSettings();
-  await loadBlockedSites();
-};
+// logic removed
+
 
 // Add event listener for add blocked site button
 const addBlockedSiteBtn = document.getElementById("addBlockedSiteBtn");
@@ -799,3 +796,37 @@ document.addEventListener("keydown", (e) => {
     resetTimer();
   }
 });
+
+// Blocked Sites Panel Logic
+const blockedSitesPanel = document.getElementById("blockedSitesPanel");
+const blockedSitesOverlay = document.getElementById("blockedSitesOverlay");
+const openBlockedSitesBtn = document.getElementById("openBlockedSitesBtn");
+const closeBlockedSitesBtn = document.getElementById("closeBlockedSitesBtn");
+
+if (openBlockedSitesBtn) {
+  openBlockedSitesBtn.addEventListener("click", openBlockedSitesPanel);
+}
+
+if (closeBlockedSitesBtn) {
+  closeBlockedSitesBtn.addEventListener("click", closeBlockedSitesPanel);
+}
+
+if (blockedSitesOverlay) {
+  blockedSitesOverlay.addEventListener("click", closeBlockedSitesPanel);
+}
+
+async function openBlockedSitesPanel() {
+  if (blockedSitesPanel && blockedSitesOverlay) {
+    blockedSitesPanel.classList.add("show");
+    blockedSitesOverlay.classList.add("show");
+    await loadBlockedSites();
+  }
+}
+
+function closeBlockedSitesPanel() {
+  if (blockedSitesPanel && blockedSitesOverlay) {
+    blockedSitesPanel.classList.remove("show");
+    blockedSitesOverlay.classList.remove("show");
+  }
+}
+
