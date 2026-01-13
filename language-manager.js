@@ -60,23 +60,30 @@ class LanguageManager {
 
   // Apply translations to all elements with data-i18n attribute
   applyTranslations() {
-    const elements = document.querySelectorAll("[data-i18n]");
-    elements.forEach((element) => {
+    // 1. Text Content
+    const textElements = document.querySelectorAll("[data-i18n]");
+    textElements.forEach((element) => {
       const key = element.getAttribute("data-i18n");
-      const translation = this.t(key);
-
-      // Handle placeholder elements
-      if (element.hasAttribute("data-i18n-placeholder")) {
-        element.placeholder = translation;
-      } else if (
-        element.tagName === "INPUT" &&
-        element.type !== "button" &&
-        element.type !== "submit"
-      ) {
-        // Don't change input values, only placeholders
-      } else {
-        element.textContent = translation;
+      // Skip if element is input/textarea (unless we want to set value? No.)
+      if (element.tagName !== "INPUT" && element.tagName !== "TEXTAREA") {
+        element.textContent = this.t(key);
+      } else if (element.type === "button" || element.type === "submit") {
+        element.value = this.t(key);
       }
+    });
+
+    // 2. Placeholders
+    const placeholderElements = document.querySelectorAll("[data-i18n-placeholder]");
+    placeholderElements.forEach((element) => {
+      const key = element.getAttribute("data-i18n-placeholder");
+      element.placeholder = this.t(key);
+    });
+
+    // 3. Titles
+    const titleElements = document.querySelectorAll("[data-i18n-title]");
+    titleElements.forEach((element) => {
+      const key = element.getAttribute("data-i18n-title");
+      element.title = this.t(key);
     });
 
     // Update title

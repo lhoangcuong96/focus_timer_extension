@@ -12,37 +12,81 @@ let settings = {
 };
 let blockedSites = [];
 
-// Load saved state
-chrome.storage.local.get(
-  ["timeLeft", "isRunning", "sessions", "totalTime", "currentMode", "settings", "blockedSites"],
-  (data) => {
-    if (data.timeLeft !== undefined) timeLeft = data.timeLeft;
-    if (data.isRunning !== undefined) isRunning = data.isRunning;
-    if (data.sessions !== undefined) sessions = data.sessions;
-    if (data.totalTime !== undefined) totalTime = data.totalTime;
-    if (data.currentMode !== undefined) currentMode = data.currentMode;
-    if (data.settings) {
-      settings = { ...settings, ...data.settings };
-    }
-    if (data.blockedSites) {
-      blockedSites = data.blockedSites;
-    }
+// Promise to track if state is loaded
+let stateLoaded = false;
+const stateReady = new Promise((resolve) => {
+  chrome.storage.local.get(
+    ["timeLeft", "isRunning", "sessions", "totalTime", "currentMode", "settings", "blockedSites", "lastActiveDate", "history"],
+    (data) => {
+      if (data.timeLeft !== undefined) timeLeft = data.timeLeft;
+      if (data.isRunning !== undefined) isRunning = data.isRunning;
+      sessions = data.sessions || 0;
+      totalTime = data.totalTime || 0;
+      if (data.currentMode !== undefined) currentMode = data.currentMode;
+      if (data.settings) {
+        settings = { ...settings, ...data.settings };
+      }
+      if (data.blockedSites) {
+        blockedSites = data.blockedSites;
+      }
+      
+      // Daily Reset Checks
+      const today = new Date().toDateString();
+      let lastActiveDate = data.lastActiveDate || today;
+      let history = data.history || [];
 
-    // If timer was running, recalculate timeLeft based on elapsed time
-    if (isRunning && data.startTime) {
-      const elapsed = Math.floor((Date.now() - data.startTime) / 1000);
-      timeLeft = Math.max(0, data.initialTimeLeft - elapsed);
-      if (timeLeft <= 0) {
-        isRunning = false;
-        handleTimerComplete();
+      if (lastActiveDate !== today) {
+        // New day! Archive previous stats if there was any activity
+        if (sessions > 0 || totalTime > 0) {
+          history.unshift({
+            date: lastActiveDate,
+            sessions: sessions,
+            totalTime: totalTime
+          });
+          
+          // Keep history limited to last 30 entries
+          if (history.length > 30) {
+            history = history.slice(0, 30);
+          }
+        }
+        
+        // Reset daily stats
+        sessions = 0;
+        totalTime = 0;
+        lastActiveDate = today;
+        
+        // We don't call saveState() here to avoid recursion or race before resolved
+      }
+      
+      // Make history available globally
+      globalThis.historyData = history;
+      globalThis.lastActiveDate = lastActiveDate;
+
+      // If timer was running, recalculate timeLeft based on elapsed time
+      if (isRunning && data.startTime) {
+        const elapsed = Math.floor((Date.now() - data.startTime) / 1000);
+        timeLeft = Math.max(0, data.initialTimeLeft - elapsed);
+        if (timeLeft <= 0) {
+          isRunning = false;
+          // We'll handle timer complete after initialization if needed
+        }
+      }
+
+      stateLoaded = true;
+      resolve();
+      
+      // Post-load updates
+      updateBlockingRules();
+      notifyUpdate();
+      
+      // If we had a pending reset from the daily check, save it now
+      if (lastActiveDate === today && (data.lastActiveDate && data.lastActiveDate !== today)) {
+          saveState();
       }
     }
+  );
+});
 
-    // Update blocking rules based on current state
-    updateBlockingRules();
-    notifyUpdate();
-  }
-);
 
 // Website Blocking Functions
 async function enableBlocking() {
@@ -173,6 +217,7 @@ function stopTimer() {
   chrome.alarms.clear("focusTimer");
   saveState();
   updateBlockingRules();
+  notifyUpdate();
 }
 
 function resetTimer() {
@@ -224,6 +269,8 @@ function handleTimerComplete() {
 }
 
 function saveState() {
+  if (!stateLoaded) return; // Never save before load is complete
+
   chrome.storage.local.set({
     timeLeft,
     isRunning,
@@ -234,6 +281,8 @@ function saveState() {
     blockedSites,
     startTime: isRunning ? startTime : null,
     initialTimeLeft: isRunning ? initialTimeLeft : null,
+    lastActiveDate: globalThis.lastActiveDate || new Date().toDateString(),
+    history: globalThis.historyData || []
   });
 }
 
@@ -252,7 +301,9 @@ function notifyUpdate() {
 }
 
 // Alarm listener
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  await stateReady; // Wait for state before processing alarm
+  
   if (alarm.name === "focusTimer" && isRunning) {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     timeLeft = initialTimeLeft - elapsed;
@@ -262,7 +313,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     if (timeLeft <= 0) {
       handleTimerComplete();
     } else {
-      saveState();
+      // Don't save state on every tick to avoid write limits and IO overhead
+      // saveState(); 
       notifyUpdate();
     }
   }
@@ -270,6 +322,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Message listener
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Call async handler but return true immediately
+  handleMessage(message, sender, sendResponse);
+  return true; 
+});
+
+async function handleMessage(message, sender, sendResponse) {
+  // Crucial: Wait for state to be loaded before processing any commands
+  await stateReady;
+
   if (message.action === "toggle") {
     if (isRunning) {
       stopTimer();
@@ -284,18 +345,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === "updateSettings") {
     updateSettings(message.settings);
   } else if (message.action === "addBlockedSite") {
-    addBlockedSite(message.site).then(result => {
-      sendResponse(result);
-    });
-    return true; // Keep channel open for async response
+    const result = await addBlockedSite(message.site);
+    sendResponse(result);
   } else if (message.action === "removeBlockedSite") {
-    removeBlockedSite(message.site).then(result => {
-      sendResponse(result);
-    });
-    return true; // Keep channel open for async response
+    const result = await removeBlockedSite(message.site);
+    sendResponse(result);
   } else if (message.action === "getBlockedSites") {
     sendResponse({ sites: blockedSites });
   } else if (message.action === "getState") {
+    // Construct history with current day's progress if there are sessions
+    let displayHistory = [...(globalThis.historyData || [])];
+    if (sessions > 0) {
+      displayHistory.unshift({
+        date: new Date().toDateString(),
+        sessions: sessions,
+        totalTime: totalTime
+      });
+    }
+
     sendResponse({
       timeLeft,
       isRunning,
@@ -304,10 +371,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       currentMode,
       settings,
       blockedSites,
+      history: displayHistory
     });
   }
-  return true;
-});
+}
 
 // Context Menu
 chrome.runtime.onInstalled.addListener(() => {
@@ -318,23 +385,24 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "blockSite") {
+    await stateReady; // Wait for state
     try {
       const url = new URL(tab.url);
       const domain = url.hostname;
-      addBlockedSite(domain).then((result) => {
-        if (result.success) {
-          // Show notification
-          chrome.notifications.create({
-            type: "basic",
-            iconUrl: "icons/icon128.png",
-            title: "Focus Timer",
-            message: `Blocked ${domain}`,
-            priority: 2,
-          });
-        }
-      });
+      const result = await addBlockedSite(domain);
+      
+      if (result.success) {
+        // Show notification
+        chrome.notifications.create({
+          type: "basic",
+          iconUrl: "icons/icon128.png",
+          title: "Focus Timer",
+          message: `Blocked ${domain}`,
+          priority: 2,
+        });
+      }
     } catch (e) {
       console.error("Invalid URL:", e);
     }

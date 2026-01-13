@@ -63,6 +63,16 @@ const translations = {
     siteAlreadyBlocked: "This site is already in the blocked list.",
     addCurrentSite: "Add Current Site",
     blockedSitesBtn: "Blocked Websites",
+    
+    // History
+    focusHistory: "Focus History",
+    noHistoryYet: "No history yet",
+
+    // Common
+    delete: "Delete",
+    cannotBlockPage: "Cannot block this type of page",
+    addSiteError: "Error adding site. Please try again.",
+    removeSiteError: "Error removing site. Please try again.",
   },
 
   vi: {
@@ -125,6 +135,16 @@ const translations = {
     siteAlreadyBlocked: "Trang web này đã có trong danh sách chặn.",
     addCurrentSite: "Thêm trang hiện tại",
     blockedSitesBtn: "Trang bị chặn",
+
+    // History
+    focusHistory: "Lịch sử tập trung",
+    noHistoryYet: "Chưa có lịch sử",
+
+    // Common
+    delete: "Xóa",
+    cannotBlockPage: "Không thể chặn loại trang này",
+    addSiteError: "Lỗi khi thêm trang web. Vui lòng thử lại.",
+    removeSiteError: "Lỗi khi xóa trang web. Vui lòng thử lại.",
   },
 
   de: {
@@ -187,5 +207,15 @@ const translations = {
     siteAlreadyBlocked: "Diese Website ist bereits in der Sperrliste.",
     addCurrentSite: "Aktuelle Seite hinzufügen",
     blockedSitesBtn: "Blockierte Websites",
+
+    // History
+    focusHistory: "Fokus-Verlauf",
+    noHistoryYet: "Noch kein Verlauf",
+
+    // Common
+    delete: "Löschen",
+    cannotBlockPage: "Dieser Seitentyp kann nicht blockiert werden",
+    addSiteError: "Fehler beim Hinzufügen der Website. Bitte versuchen Sie es erneut.",
+    removeSiteError: "Fehler beim Entfernen der Website. Bitte versuchen Sie es erneut.",
   },
 };

@@ -328,13 +328,13 @@ if (changeBgBtn) {
 }
 
 // Tasks panel event listeners
-const tasksIcon = document.getElementById("tasksIcon");
+const openTasksBtn = document.getElementById("openTasksBtn");
 const tasksPanel = document.getElementById("tasksPanel");
 const tasksOverlay = document.getElementById("tasksOverlay");
 const closeTasksBtn = document.getElementById("closeTasksBtn");
 
-if (tasksIcon) {
-  tasksIcon.addEventListener("click", openTasksPanel);
+if (openTasksBtn) {
+  openTasksBtn.addEventListener("click", openTasksPanel);
 }
 
 if (closeTasksBtn) {
@@ -459,7 +459,7 @@ function renderTasks() {
       <div class="task-text">${escapeHtml(task.text)}</div>
       <button class="task-delete-btn" data-action="delete" data-task-id="${
         task.id
-      }" title="Delete">
+      }" title="Delete" data-i18n-title="delete">
         <svg viewBox="0 0 24 24">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -469,6 +469,10 @@ function renderTasks() {
   `
     )
     .join("");
+    
+  if (typeof languageManager !== "undefined") {
+    languageManager.applyTranslations();
+  }
 
   // Add event listeners
   tasksList.querySelectorAll("[data-action='toggle']").forEach((btn) => {
@@ -689,7 +693,7 @@ function addCurrentSiteToList() {
             addBlockedSiteToList();
           }
         } else {
-           alert("Cannot block this type of page");
+           alert(languageManager.t("cannotBlockPage"));
         }
       } catch (e) {
         console.error("Invalid URL:", e);
@@ -728,7 +732,7 @@ async function addBlockedSiteToList() {
     }
   } catch (error) {
     console.error("Error adding blocked site:", error);
-    alert("Error adding site. Please try again.");
+    alert(languageManager.t("addSiteError"));
   }
 }
 
@@ -745,7 +749,7 @@ async function removeBlockedSiteFromList(site) {
     }
   } catch (error) {
     console.error("Error removing blocked site:", error);
-    alert("Error removing site. Please try again.");
+    alert(languageManager.t("removeSiteError"));
   }
 }
 
@@ -796,6 +800,91 @@ document.addEventListener("keydown", (e) => {
     resetTimer();
   }
 });
+
+// History Panel Logic
+const historyIcon = document.getElementById("historyIcon");
+const historyPanel = document.getElementById("historyPanel");
+const historyOverlay = document.getElementById("historyOverlay");
+const closeHistoryBtn = document.getElementById("closeHistoryBtn");
+
+if (historyIcon) {
+  historyIcon.addEventListener("click", openHistoryPanel);
+}
+
+if (closeHistoryBtn) {
+  closeHistoryBtn.addEventListener("click", closeHistoryPanel);
+}
+
+if (historyOverlay) {
+  historyOverlay.addEventListener("click", closeHistoryPanel);
+}
+
+let historyData = [];
+
+async function loadHistory() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: "getState" });
+    if (response && response.history) {
+      historyData = response.history;
+    } else {
+      historyData = [];
+    }
+    renderHistory();
+  } catch (error) {
+    console.error("Error loading history:", error);
+  }
+}
+
+function renderHistory() {
+  const historyList = document.getElementById("historyList");
+  if (!historyList) return;
+
+  if (historyData.length === 0) {
+    historyList.innerHTML = `<div class="no-history">${languageManager.t("noHistoryYet")}</div>`;
+    return;
+  }
+
+  const sessionsLabel = languageManager.t("sessions");
+  const minsLabel = languageManager.t("minutes");
+
+  historyList.innerHTML = historyData
+    .map(
+      (item) => `
+    <div class="history-item">
+      <div class="history-date">${formatDate(item.date)}</div>
+      <div class="history-stats">
+        <div class="history-stat">
+          <strong>${item.sessions}</strong> ${sessionsLabel}
+        </div>
+        <div class="history-stat">
+          <strong>${item.totalTime}</strong> ${minsLabel}
+        </div>
+      </div>
+    </div>
+  `
+    )
+    .join("");
+}
+
+function formatDate(dateString) {
+  const options = { year: 'numeric', month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString(undefined, options);
+}
+
+function openHistoryPanel() {
+  if (historyPanel && historyOverlay) {
+    historyPanel.classList.add("show");
+    historyOverlay.classList.add("show");
+    loadHistory();
+  }
+}
+
+function closeHistoryPanel() {
+  if (historyPanel && historyOverlay) {
+    historyPanel.classList.remove("show");
+    historyOverlay.classList.remove("show");
+  }
+}
 
 // Blocked Sites Panel Logic
 const blockedSitesPanel = document.getElementById("blockedSitesPanel");
